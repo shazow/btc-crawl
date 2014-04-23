@@ -115,8 +115,7 @@ func (c *Crawler) addAddress(address string) bool {
 	return true
 }
 
-func (c *Crawler) Start() (chan struct{}, error) {
-	done := make(chan struct{}, 1)
+func (c *Crawler) Start() {
 	numWorkers := 0
 	numGood := 0
 
@@ -159,8 +158,7 @@ func (c *Crawler) Start() (chan struct{}, error) {
 
 			if len(c.queue) == 0 && numWorkers == 0 {
 				log.Printf("Done.")
-				done <- struct{}{}
-				return done, nil
+				return
 			}
 
 			<-c.workers
