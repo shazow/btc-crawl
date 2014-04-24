@@ -37,6 +37,7 @@ func (p *Peer) Connect() error {
 
 func (p *Peer) Disconnect() {
 	p.conn.Close()
+	log.Printf("[%s] Closed.", p.address)
 }
 
 func (p *Peer) Handshake() error {

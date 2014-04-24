@@ -8,24 +8,24 @@ import (
 
 // TODO: Break Client/Peer/Crawler into separate modules.
 type Crawler struct {
-	client      *Client
-	count       int
-	seenFilter  map[string]bool // TODO: Replace with bloom filter?
-	results     chan []string
-	workers     chan struct{}
-	queue       []string
-	activeSince time.Duration
+	client     *Client
+	count      int
+	seenFilter map[string]bool // TODO: Replace with bloom filter?
+	results    chan []string
+	workers    chan struct{}
+	queue      []string
+	peerAge    time.Duration
 }
 
-func NewCrawler(client *Client, queue []string, numWorkers int) *Crawler {
+func NewCrawler(client *Client, queue []string, numWorkers int, peerAge time.Duration) *Crawler {
 	c := Crawler{
-		client:      client,
-		count:       0,
-		seenFilter:  map[string]bool{},
-		results:     make(chan []string),
-		workers:     make(chan struct{}, numWorkers),
-		queue:       []string{},
-		activeSince: time.Hour * -24,
+		client:     client,
+		count:      0,
+		seenFilter: map[string]bool{},
+		results:    make(chan []string),
+		workers:    make(chan struct{}, numWorkers),
+		queue:      []string{},
+		peerAge:    peerAge,
 	}
 
 	// Prefill the queue
@@ -65,7 +65,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 	firstReceived := -1
 	tolerateMessages := 3
 	otherMessages := []string{}
-	timestampSince := time.Now().Add(c.activeSince)
+	timestampSince := time.Now().Add(-c.peerAge)
 
 	for {
 		// We can't really tell when we're done receiving peers, so we stop either
@@ -81,6 +81,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 		case *btcwire.MsgAddr:
 			for _, addr := range tmsg.AddrList {
 				if addr.Timestamp.After(timestampSince) {
+					// TODO: Move this check to .Start()?
 					r = append(r, NetAddressKey(addr))
 				}
 			}
@@ -154,7 +155,9 @@ func (c *Crawler) Start() {
 			}
 			numWorkers -= 1
 
-			log.Printf("Added %d new peers of %d returned. Total %d known peers via %d connected.", newAdded, len(r), c.count, numGood)
+			if len(r) > 0 {
+				log.Printf("Added %d new peers of %d returned. Total %d known peers via %d connected.", newAdded, len(r), c.count, numGood)
+			}
 
 			if len(c.queue) == 0 && numWorkers == 0 {
 				log.Printf("Done.")
