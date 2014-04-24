@@ -13,15 +13,16 @@ func GetSeedsFromDNS(dnsSeeds []string) []string {
 
 	for _, address := range dnsSeeds {
 		wait.Add(1)
-		go func() {
+		go func(address string) {
 			defer wait.Done()
 			ips, err := net.LookupIP(address)
 			if err != nil {
 				log.Printf("Failed to resolve %s: %v", address, err)
 				return
 			}
+			log.Printf("Resolved %d seeds from %s.", len(ips), address)
 			results <- ips
-		}()
+		}(address)
 	}
 
 	go func() {
