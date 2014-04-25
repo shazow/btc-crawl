@@ -88,7 +88,7 @@ func (p *Peer) Handshake() error {
 }
 
 func (p *Peer) WriteMessage(msg btcwire.Message) error {
-	return btcwire.WriteMessage(p.conn, btcwire.NewMsgGetAddr(), p.client.pver, p.client.btcnet)
+	return btcwire.WriteMessage(p.conn, msg, p.client.pver, p.client.btcnet)
 }
 
 func (p *Peer) ReadMessage() (btcwire.Message, []byte, error) {
