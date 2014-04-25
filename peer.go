@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/conformal/btcwire"
-	"log"
 	"net"
 )
 
@@ -37,7 +36,7 @@ func (p *Peer) Connect() error {
 
 func (p *Peer) Disconnect() {
 	p.conn.Close()
-	log.Printf("[%s] Closed.", p.address)
+	logger.Debugf("[%s] Closed.", p.address)
 }
 
 func (p *Peer) Handshake() error {
@@ -45,7 +44,7 @@ func (p *Peer) Handshake() error {
 		return fmt.Errorf("Peer is not connected, can't handshake.")
 	}
 
-	log.Printf("[%s] Starting handshake.", p.address)
+	logger.Debugf("[%s] Starting handshake.", p.address)
 
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {
@@ -74,7 +73,7 @@ func (p *Peer) Handshake() error {
 	if uint32(vmsg.ProtocolVersion) < pver {
 		pver = uint32(vmsg.ProtocolVersion)
 	}
-	log.Printf("[%s] -> Version: %s", p.address, vmsg.UserAgent)
+	logger.Debugf("[%s] -> Version: %s", p.address, vmsg.UserAgent)
 
 	// Normally we'd check if vmsg.Nonce == p.nonce but the crawler does not
 	// accept external connections so we skip it.

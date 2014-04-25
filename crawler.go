@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/conformal/btcwire"
-	"log"
 	"time"
 )
 
@@ -44,20 +43,20 @@ func (c *Crawler) handleAddress(address string) *[]string {
 
 	err := peer.Connect()
 	if err != nil {
-		log.Printf("[%s] Connection failed: %v", address, err)
+		logger.Debugf("[%s] Connection failed: %v", address, err)
 		return &r
 	}
 	defer peer.Disconnect()
 
 	err = peer.Handshake()
 	if err != nil {
-		log.Printf("[%s] Handsake failed: %v", address, err)
+		logger.Debugf("[%s] Handsake failed: %v", address, err)
 		return &r
 	}
 
 	// Send getaddr.
 	if err := btcwire.WriteMessage(peer.conn, btcwire.NewMsgGetAddr(), client.pver, client.btcnet); err != nil {
-		log.Printf("[%s] GetAddr failed: %v", address, err)
+		logger.Warningf("[%s] GetAddr failed: %v", address, err)
 		return &r
 	}
 
@@ -73,7 +72,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 		// many unrelated messages.
 		msg, _, err := btcwire.ReadMessage(peer.conn, client.pver, client.btcnet)
 		if err != nil {
-			log.Printf("[%s] Failed to read message: %v", address, err)
+			logger.Warningf("[%s] Failed to read message: %v", address, err)
 			continue
 		}
 
@@ -95,7 +94,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 		default:
 			otherMessages = append(otherMessages, tmsg.Command())
 			if len(otherMessages) > tolerateMessages {
-				log.Printf("[%s] Giving up with %d results after tolerating messages: %v.", address, len(r), otherMessages)
+				logger.Debugf("[%s] Giving up with %d results after tolerating messages: %v.", address, len(r), otherMessages)
 				return &r
 			}
 		}
@@ -137,7 +136,7 @@ func (c *Crawler) Start() {
 			numWorkers += 1
 
 			go func() {
-				log.Printf("[%s] Worker started.", address)
+				logger.Debugf("[%s] Worker started.", address)
 				results := *c.handleAddress(address)
 				c.results <- results
 			}()
@@ -156,11 +155,11 @@ func (c *Crawler) Start() {
 			numWorkers -= 1
 
 			if len(r) > 0 {
-				log.Printf("Added %d new peers of %d returned. Total %d known peers via %d connected.", newAdded, len(r), c.count, numGood)
+				logger.Infof("Added %d new peers of %d returned. Total %d known peers via %d connected.", newAdded, len(r), c.count, numGood)
 			}
 
 			if len(c.queue) == 0 && numWorkers == 0 {
-				log.Printf("Done.")
+				logger.Infof("Done.")
 				return
 			}
 
