@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/conformal/btcwire"
 	"net"
+
+	"github.com/conformal/btcwire"
 )
 
 type Peer struct {
@@ -84,4 +85,12 @@ func (p *Peer) Handshake() error {
 	}
 
 	return nil
+}
+
+func (p *Peer) WriteMessage(msg btcwire.Message) error {
+	return btcwire.WriteMessage(p.conn, btcwire.NewMsgGetAddr(), p.client.pver, p.client.btcnet)
+}
+
+func (p *Peer) ReadMessage() (btcwire.Message, []byte, error) {
+	return btcwire.ReadMessage(p.conn, p.client.pver, p.client.btcnet)
 }

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/conformal/btcwire"
 	"time"
+
+	"github.com/conformal/btcwire"
 )
 
 // TODO: Break Client/Peer/Crawler into separate modules.
@@ -55,7 +56,8 @@ func (c *Crawler) handleAddress(address string) *[]string {
 	}
 
 	// Send getaddr.
-	if err := btcwire.WriteMessage(peer.conn, btcwire.NewMsgGetAddr(), client.pver, client.btcnet); err != nil {
+	err = peer.WriteMessage(btcwire.NewMsgGetAddr())
+	if err != nil {
 		logger.Warningf("[%s] GetAddr failed: %v", address, err)
 		return &r
 	}
@@ -70,7 +72,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 		// We can't really tell when we're done receiving peers, so we stop either
 		// when we get a smaller-than-normal set size or when we've received too
 		// many unrelated messages.
-		msg, _, err := btcwire.ReadMessage(peer.conn, client.pver, client.btcnet)
+		msg, _, err := peer.ReadMessage()
 		if err != nil {
 			logger.Warningf("[%s] Failed to read message: %v", address, err)
 			continue
