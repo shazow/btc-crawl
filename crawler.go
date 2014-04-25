@@ -11,19 +11,20 @@ type Crawler struct {
 	client     *Client
 	count      int
 	seenFilter map[string]bool // TODO: Replace with bloom filter?
-	results    chan []string
-	workers    chan struct{}
 	queue      []string
 	peerAge    time.Duration
 }
 
-func NewCrawler(client *Client, queue []string, numWorkers int, peerAge time.Duration) *Crawler {
+type Result struct {
+	Node  *Peer
+	Peers []*btcwire.NetAddress
+}
+
+func NewCrawler(client *Client, queue []string, peerAge time.Duration) *Crawler {
 	c := Crawler{
 		client:     client,
 		count:      0,
 		seenFilter: map[string]bool{},
-		results:    make(chan []string),
-		workers:    make(chan struct{}, numWorkers),
 		queue:      []string{},
 		peerAge:    peerAge,
 	}
@@ -36,11 +37,10 @@ func NewCrawler(client *Client, queue []string, numWorkers int, peerAge time.Dur
 	return &c
 }
 
-func (c *Crawler) handleAddress(address string) *[]string {
-	r := []string{}
-
+func (c *Crawler) handleAddress(address string) *Result {
 	client := c.client
 	peer := NewPeer(client, address)
+	r := Result{Node: peer}
 
 	err := peer.Connect()
 	if err != nil {
@@ -66,7 +66,6 @@ func (c *Crawler) handleAddress(address string) *[]string {
 	firstReceived := -1
 	tolerateMessages := 3
 	otherMessages := []string{}
-	timestampSince := time.Now().Add(-c.peerAge)
 
 	for {
 		// We can't really tell when we're done receiving peers, so we stop either
@@ -80,12 +79,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 
 		switch tmsg := msg.(type) {
 		case *btcwire.MsgAddr:
-			for _, addr := range tmsg.AddrList {
-				if addr.Timestamp.After(timestampSince) {
-					// TODO: Move this check to .Start()?
-					r = append(r, NetAddressKey(addr))
-				}
-			}
+			r.Peers = append(r.Peers, tmsg.AddrList...)
 
 			if firstReceived == -1 {
 				firstReceived = len(tmsg.AddrList)
@@ -96,7 +90,7 @@ func (c *Crawler) handleAddress(address string) *[]string {
 		default:
 			otherMessages = append(otherMessages, tmsg.Command())
 			if len(otherMessages) > tolerateMessages {
-				logger.Debugf("[%s] Giving up with %d results after tolerating messages: %v.", address, len(r), otherMessages)
+				logger.Debugf("[%s] Giving up with %d results after tolerating messages: %v.", address, len(r.Peers), otherMessages)
 				return &r
 			}
 		}
@@ -117,36 +111,46 @@ func (c *Crawler) addAddress(address string) bool {
 	return true
 }
 
-func (c *Crawler) Start() {
-	numWorkers := 0
+func (c *Crawler) Run(numWorkers int, stopAfter int) *[]Result {
+	numActive := 0
 	numGood := 0
+
+	resultChan := make(chan Result)
+	workerChan := make(chan struct{}, numWorkers)
+
+	results := []Result{}
 
 	// This is the main "event loop". Feels like there may be a better way to
 	// manage the number of concurrent workers but I can't think of it right now.
 	for {
 		select {
-		case c.workers <- struct{}{}:
+		case workerChan <- struct{}{}:
 			if len(c.queue) == 0 {
 				// No work yet.
-				<-c.workers
+				<-workerChan
 				continue
 			}
 
 			// Pop from the queue
 			address := c.queue[0]
 			c.queue = c.queue[1:]
-			numWorkers += 1
+			numActive += 1
 
 			go func() {
 				logger.Debugf("[%s] Worker started.", address)
-				results := *c.handleAddress(address)
-				c.results <- results
+				resultChan <- *c.handleAddress(address)
 			}()
 
-		case r := <-c.results:
+		case r := <-resultChan:
 			newAdded := 0
-			for _, address := range r {
-				if c.addAddress(address) {
+			timestampSince := time.Now().Add(-c.peerAge)
+
+			for _, addr := range r.Peers {
+				if !addr.Timestamp.After(timestampSince) {
+					continue
+				}
+
+				if c.addAddress(NetAddressKey(addr)) {
 					newAdded += 1
 				}
 			}
@@ -154,18 +158,21 @@ func (c *Crawler) Start() {
 			if newAdded > 0 {
 				numGood += 1
 			}
-			numWorkers -= 1
+			numActive -= 1
 
-			if len(r) > 0 {
-				logger.Infof("Added %d new peers of %d returned. Total %d known peers via %d connected.", newAdded, len(r), c.count, numGood)
+			if len(r.Peers) > 0 {
+				stopAfter--
+				results = append(results, r)
+
+				logger.Infof("Added %d new peers of %d returned. Total %d known peers via %d connected.", newAdded, len(r.Peers), c.count, numGood)
 			}
 
-			if len(c.queue) == 0 && numWorkers == 0 {
+			if stopAfter == 0 || (len(c.queue) == 0 && numActive == 0) {
 				logger.Infof("Done.")
-				return
+				return &results
 			}
 
-			<-c.workers
+			<-workerChan
 		}
 	}
 }

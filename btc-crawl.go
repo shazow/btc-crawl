@@ -1,8 +1,10 @@
-// TODO: Export to a reasonable format.
 // TODO: Namespace packages properly (outside of `main`)
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -23,10 +25,12 @@ var defaultDnsSeeds = []string{
 
 type Options struct {
 	Verbose     []bool        `short:"v" long:"verbose" description:"Show verbose logging."`
+	Output      string        `short:"o" long:"output" description:"File to write result to." default:"btc-crawl.json"`
 	Seed        []string      `short:"s" long:"seed" description:"Override which seeds to use." default-mask:"<bitcoin-core DNS seeds>"`
 	Concurrency int           `short:"c" long:"concurrency" description:"Maximum number of concurrent connections to open." default:"10"`
 	UserAgent   string        `short:"A" long:"user-agent" description:"Client name to advertise while crawling. Should be in format of '/name:x.y.z/'." default:"/btc-crawl:0.1.1/"`
 	PeerAge     time.Duration `long:"peer-age" description:"Ignore discovered peers older than this." default:"24h"`
+	StopAfter   int           `long:"stop-after" description:"Stop crawling after this many results."`
 }
 
 var logLevels = []log.Level{
@@ -39,9 +43,11 @@ func main() {
 	options := Options{}
 	parser := flags.NewParser(&options, flags.Default)
 
-	_, err := parser.Parse()
+	p, err := parser.Parse()
 	if err != nil {
-		// FIXME: Print on some specific errors? Seems Parse prints in most cases.
+		if p == nil {
+			fmt.Print(err)
+		}
 		return
 	}
 
@@ -60,6 +66,25 @@ func main() {
 	}
 
 	client := NewClient(options.UserAgent)
-	crawler := NewCrawler(client, seedNodes, options.Concurrency, options.PeerAge)
-	crawler.Start()
+	crawler := NewCrawler(client, seedNodes, options.PeerAge)
+	results := crawler.Run(options.Concurrency, options.StopAfter)
+
+	b, err := json.Marshal(results)
+	if err != nil {
+		logger.Errorf("Failed to export JSON: %v", err)
+		return
+	}
+
+	if options.Output == "-" {
+		os.Stdout.Write(b)
+		return
+	}
+
+	err = ioutil.WriteFile(options.Output, b, 0644)
+	if err != nil {
+		logger.Errorf("Failed to write to %s: %v", options.Output, err)
+		return
+	}
+
+	logger.Infof("Written %d results: %s", len(*results), options.Output)
 }
