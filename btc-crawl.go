@@ -40,6 +40,7 @@ var logLevels = []log.Level{
 }
 
 func main() {
+	now := time.Now()
 	options := Options{}
 	parser := flags.NewParser(&options, flags.Default)
 
@@ -86,5 +87,5 @@ func main() {
 		return
 	}
 
-	logger.Infof("Written %d results: %s", len(*results), options.Output)
+	logger.Infof("Written %d results after %s: %s", len(*results), time.Now().Sub(now), options.Output)
 }
