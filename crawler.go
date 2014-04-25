@@ -120,6 +120,11 @@ func (c *Crawler) Run(numWorkers int, stopAfter int) *[]Result {
 
 	results := []Result{}
 
+	if stopAfter == 0 {
+		// No stopping.
+		stopAfter = -1
+	}
+
 	// This is the main "event loop". Feels like there may be a better way to
 	// manage the number of concurrent workers but I can't think of it right now.
 	for {
