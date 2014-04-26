@@ -15,6 +15,8 @@ stdout.~~
 
 ```
 $ go get github.com/shazow/btc-crawl
+$ btc-crawl --help
+...
 $ btc-crawl --concurrency 100 --output btc-crawl.json --verbose
 ...
 ```
