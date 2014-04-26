@@ -1,5 +1,3 @@
-// TODO: Namespace packages properly (outside of `main`)
-// TODO: Apply peer-age filter to results?
 package main
 
 import (
