@@ -15,15 +15,22 @@ stdout.~~
 
 ```
 $ go get github.com/shazow/btc-crawl
-$ btc-crawl
+$ btc-crawl --concurrency 100 --output btc-crawl.json --verbose
 ...
 ```
+
+*Estimated crawl time:* Unknown.
+
+There should be under 10,000 active network nodes at any given time, according
+to (bitnodes.io)[https://getaddr.bitnodes.io/]. Each node returns around ~2,500
+known nodes, but usually only several have timestamps within the last hour.
 
 
 ## Todo
 
 (In approximate order of priority)
 
+* Add some sensible non-verbose output
 * Apply peer-age filter to results
 * Stream JSON rather than accumulate into a giant array.
 * Add timeout option.
