@@ -38,3 +38,8 @@ known nodes, but usually only several have timestamps within the last hour.
 * Add timeout option.
 * Graceful cleanup on Ctrl+C
 * Namespace packages properly (outside of `main`)
+
+
+## License
+
+MIT (see LICENSE file).
