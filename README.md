@@ -21,7 +21,7 @@ $ btc-crawl --concurrency 100 --output btc-crawl.json --verbose
 ...
 ```
 
-*Estimated crawl time:* Unknown.
+**Estimated crawl time:** Unknown.
 
 There should be under 10,000 active network nodes at any given time, according
 to [bitnodes.io](https://getaddr.bitnodes.io/). Each node returns around ~2,500
