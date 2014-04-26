@@ -7,7 +7,7 @@ This is a for-fun project to explore the Bitcoin protocol and network.
 Current status: 
 * It crawls with all kinds of nice parameters but stores everything in memory
   until dumping a giant JSON blob at the end.
-* --It crawls from hard-coded values and spits a bunch of stuff to
+* ~~It crawls from hard-coded values and spits a bunch of stuff to
 stdout.~~
 
 
