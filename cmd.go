@@ -29,7 +29,7 @@ type Options struct {
 	Concurrency int           `short:"c" long:"concurrency" description:"Maximum number of concurrent connections to open." default:"10"`
 	UserAgent   string        `short:"A" long:"user-agent" description:"Client name to advertise while crawling. Should be in format of '/name:x.y.z/'." default:"/btc-crawl:0.1.1/"`
 	PeerAge     time.Duration `long:"peer-age" description:"Ignore discovered peers older than this." default:"24h"`
-	StopAfter   int           `long:"stop-after" description:"Stop crawling after this many results." default:"0"`
+	StopAfter   int           `long:"stop-after" description:"Stop crawling after this many results." default:"-1"`
 }
 
 var logLevels = []log.Level{
