@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/alexcesaro/log"
@@ -29,7 +30,7 @@ type Options struct {
 	Concurrency int           `short:"c" long:"concurrency" description:"Maximum number of concurrent connections to open." default:"10"`
 	UserAgent   string        `short:"A" long:"user-agent" description:"Client name to advertise while crawling. Should be in format of '/name:x.y.z/'." default:"/btc-crawl:0.1.1/"`
 	PeerAge     time.Duration `long:"peer-age" description:"Ignore discovered peers older than this." default:"24h"`
-	StopAfter   int           `long:"stop-after" description:"Stop crawling after this many results." default:"-1"`
+	StopAfter   int           `long:"stop-after" description:"Stop crawling after this many results." default:"0"`
 }
 
 var logLevels = []log.Level{
@@ -65,26 +66,87 @@ func main() {
 		seedNodes = GetSeedsFromDNS(defaultDnsSeeds)
 	}
 
+	// Create client and crawler
 	client := NewClient(options.UserAgent)
 	crawler := NewCrawler(client, seedNodes, options.PeerAge)
-	results := crawler.Run(options.Concurrency, options.StopAfter)
 
-	b, err := json.Marshal(results)
+	// Configure output
+	var w *bufio.Writer
+	if options.Output == "-" || options.Output == "" {
+		w = bufio.NewWriter(os.Stdout)
+		defer w.Flush()
+	} else {
+		fp, err := os.Create(options.Output)
+		if err != nil {
+			logger.Errorf("Failed to create file: %v", err)
+			return
+		}
+
+		w = bufio.NewWriter(fp)
+		defer w.Flush()
+		defer fp.Close()
+	}
+
+	// Make the first write, make sure everything is cool
+	_, err = w.Write([]byte("["))
 	if err != nil {
-		logger.Errorf("Failed to export JSON: %v", err)
+		logger.Errorf("Failed to write result, aborting immediately: %v", err)
 		return
 	}
 
-	if options.Output == "-" {
-		os.Stdout.Write(b)
-		return
+	isActive := true
+
+	// Construct interrupt handler
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	go func() {
+		<-sig // Wait for ^C signal
+		logger.Warningf("Interrupt signal detected, shutting down gracefully by waiting for active workers to finish.")
+		crawler.Shutdown()
+
+		// FIXME: This isn't working?
+		<-sig // Hurry up?
+		logger.Warningf("Super-interrupt. Abandoning in-progress workers.")
+		isActive = false
+	}()
+
+	// Launch crawler
+	resultChan := make(chan Result)
+	go crawler.Run(resultChan, options.Concurrency)
+	logger.Infof("Crawler started with %d concurrency limit.", options.Concurrency)
+
+	// Start processing results
+	count := 0
+	for result := range resultChan {
+		b, err := json.Marshal(result)
+		if err != nil {
+			logger.Warningf("Failed to export JSON, skipping: %v", err)
+		}
+
+		if count > 0 {
+			b = append([]byte(","), b...)
+		}
+
+		_, err = w.Write(b)
+		if err != nil {
+			logger.Errorf("Failed to write result, aborting gracefully: %v", err)
+			crawler.Shutdown()
+			break
+		}
+
+		count++
+		if options.StopAfter > 0 && count > options.StopAfter {
+			logger.Infof("StopAfter count reached, shutting down gracefully.")
+			crawler.Shutdown()
+		}
+
+		if !isActive {
+			// No time to wait, finish writing and quit.
+			break
+		}
 	}
 
-	err = ioutil.WriteFile(options.Output, b, 0644)
-	if err != nil {
-		logger.Errorf("Failed to write to %s: %v", options.Output, err)
-		return
-	}
+	w.Write([]byte("]")) // No error checking here because it's too late to care.
 
-	logger.Infof("Written %d results after %s: %s", len(*results), time.Now().Sub(now), options.Output)
+	logger.Infof("Written %d results after %s: %s", count, time.Now().Sub(now), options.Output)
 }

@@ -18,6 +18,7 @@ type Crawler struct {
 	numAttempted int
 	seenFilter   map[string]bool // TODO: Replace with bloom filter?
 	peerAge      time.Duration
+	shutdown     chan struct{}
 }
 
 type Result struct {
@@ -44,6 +45,10 @@ func NewCrawler(client *Client, seeds []string, peerAge time.Duration) *Crawler 
 	}()
 
 	return &c
+}
+
+func (c *Crawler) Shutdown() {
+	c.shutdown <- struct{}{}
 }
 
 func (c *Crawler) handleAddress(address string) *Result {
@@ -124,103 +129,65 @@ func (c *Crawler) filter(address string) *string {
 	return &address
 }
 
-/*
-func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
-	workChan := make(chan string, numWorkers)
-	queueChan := make(chan string)
-	tempResult := make(chan Result)
+func (c *Crawler) process(r *Result) *Result {
+	timestampSince := time.Now().Add(-c.peerAge)
 
-	go func(queueChan <-chan string) {
-		// Single thread to safely manage the queue
-		c.addAddress(<-queueChan)
-		nextAddress, _ := c.popAddress()
-
-		for {
-			select {
-			case address := <-queueChan:
-				// Enque address
-				c.addAddress(address)
-			case workChan <- nextAddress:
-				nextAddress, err := c.popAddress()
-				if err != nil {
-					// Block until we get more work
-					c.addAddress(<-queueChan)
-					nextAddress, _ = c.popAddress()
-				}
-			}
+	for _, addr := range r.Peers {
+		if !addr.Timestamp.After(timestampSince) {
+			continue
 		}
-	}(queueChan)
 
-	go func(tempResult <-chan Result, workChan chan<- string) {
-		// Convert from result to queue.
-		for {
-			select {
-			case r := <-tempResult:
-
-			}
-		}
-	}(tempResult, workChan)
-
-	for address := range workChan {
-		// Spawn more workers as we get buffered work
-		go func() {
-			logger.Debugf("[%s] Worker started.", address)
-			tempResult <- *c.handleAddress(address)
-		}()
+		c.queue.Input <- NetAddressKey(addr)
 	}
+
+	if len(r.Peers) > 0 {
+		logger.Infof("[%s] Returned %d peers. Total %d unique peers via %d connected (of %d attempted).", r.Node.Address, len(r.Peers), c.numUnique, c.numConnected, c.numAttempted)
+		return r
+	}
+
+	return nil
 }
-*/
 
-func (c *Crawler) Run(numWorkers int, stopAfter int) *[]Result {
-	numActive := 0
-
-	resultChan := make(chan Result)
+func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 	workerChan := make(chan struct{}, numWorkers)
+	tempResult := make(chan Result)
+	numActive := 0
+	isActive := true
 
-	results := []Result{}
-
-	if stopAfter == 0 {
-		// No stopping.
-		stopAfter = -1
-	}
-
-	// This is the main "event loop". Feels like there may be a better way to
-	// manage the number of concurrent workers but I can't think of it right now.
+	// This is the main "event loop".
+	// FIXME: Feels like there should be a better way to manage the number of
+	// concurrent workers without limiting slots with workerChan and without
+	// using a numActive counter.
 	for {
 		select {
 		case workerChan <- struct{}{}:
+			if !isActive {
+				// Don't start any new workers, leave the slot filled.
+				break
+			}
+
+			numActive++
 			go func() {
 				address := <-c.queue.Output
 				logger.Debugf("[%s] Worker started.", address)
-				resultChan <- *c.handleAddress(address)
+				tempResult <- *c.handleAddress(address)
 			}()
 
-		case r := <-resultChan:
-			timestampSince := time.Now().Add(-c.peerAge)
-
-			for _, addr := range r.Peers {
-				if !addr.Timestamp.After(timestampSince) {
-					continue
-				}
-
-				c.queue.Input <- NetAddressKey(addr)
+		case r := <-tempResult:
+			if c.process(&r) != nil {
+				resultChan <- r
 			}
 
 			numActive--
-
-			if len(r.Peers) > 0 {
-				stopAfter--
-				results = append(results, r)
-
-				logger.Infof("[%s] Returned %d peers. Total %d unique peers via %d connected (of %d attempted).", r.Node.Address, len(r.Peers), c.numUnique, c.numConnected, c.numAttempted)
-			}
-
-			if stopAfter == 0 || (c.queue.IsEmpty() && numActive == 0) {
+			if (!isActive || c.queue.IsEmpty()) && numActive == 0 {
 				logger.Infof("Done.")
-				return &results
+				close(resultChan)
 			}
 
 			<-workerChan
+
+		case <-c.shutdown:
+			isActive = false
 		}
 	}
 }
