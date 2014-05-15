@@ -31,6 +31,7 @@ func NewCrawler(client *Client, seeds []string, peerAge time.Duration) *Crawler 
 		client:     client,
 		seenFilter: map[string]bool{},
 		peerAge:    peerAge,
+		shutdown:   make(chan struct{}, 1),
 	}
 	filter := func(address string) *string {
 		return c.filter(address)
@@ -187,6 +188,7 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 			<-workerChan
 
 		case <-c.shutdown:
+			logger.Infof("Shutting down.")
 			isActive = false
 		}
 	}

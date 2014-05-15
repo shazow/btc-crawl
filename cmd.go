@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/alexcesaro/log"
@@ -94,24 +95,22 @@ func main() {
 		return
 	}
 
-	isActive := true
+	resultChan := make(chan Result)
 
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sig // Wait for ^C signal
 		logger.Warningf("Interrupt signal detected, shutting down gracefully by waiting for active workers to finish.")
 		crawler.Shutdown()
 
-		// FIXME: This isn't working?
 		<-sig // Hurry up?
-		logger.Warningf("Super-interrupt. Abandoning in-progress workers.")
-		isActive = false
+		logger.Warningf("Urgent interrupt. Abandoning in-progress workers.")
+		close(resultChan) // FIXME: Could this cause stuff to asplode?
 	}()
 
 	// Launch crawler
-	resultChan := make(chan Result)
 	go crawler.Run(resultChan, options.Concurrency)
 	logger.Infof("Crawler started with %d concurrency limit.", options.Concurrency)
 
@@ -138,11 +137,6 @@ func main() {
 		if options.StopAfter > 0 && count > options.StopAfter {
 			logger.Infof("StopAfter count reached, shutting down gracefully.")
 			crawler.Shutdown()
-		}
-
-		if !isActive {
-			// No time to wait, finish writing and quit.
-			break
 		}
 	}
 
