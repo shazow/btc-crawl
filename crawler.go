@@ -170,13 +170,14 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 				// Don't start any new workers, leave the slot filled.
 				break
 			} else if c.queue.IsEmpty() {
-				<-workerChan
-
 				if numActive == 0 {
-					logger.Infof("Done.")
+					logger.Infof("Done after %d queued items.", c.queue.Count())
 					close(resultChan)
 					return
 				}
+
+				<-workerChan
+				break
 			}
 
 			numActive++
@@ -194,7 +195,7 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 			<-workerChan
 
 		case <-c.shutdown:
-			logger.Infof("Shutting down.")
+			logger.Infof("Shutting down after %d workers finish.", numActive)
 			isActive = false
 		}
 	}

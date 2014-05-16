@@ -1,5 +1,5 @@
 btc-crawl: **.go
-	go build .
+	go build ./...
 
 build: btc-crawl
 

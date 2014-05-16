@@ -7,6 +7,7 @@ type Queue struct {
 	Output   chan string
 	overflow []string
 	filter   func(string) *string
+	count    int
 }
 
 func NewQueue(filter func(string) *string, bufferSize int) *Queue {
@@ -23,12 +24,13 @@ func NewQueue(filter func(string) *string, bufferSize int) *Queue {
 
 		for {
 			select {
-			case input := <-q.Input:
+			case item := <-input:
 				// New input
-				r := q.filter(input)
+				r := q.filter(item)
 				if r != nil {
 					// Store in the overflow
 					q.overflow = append(q.overflow, *r)
+					q.count++
 				}
 			case output <- nextItem:
 				// Block until we have more inputs
@@ -55,6 +57,7 @@ func (q *Queue) next() string {
 		r := q.filter(<-q.Input)
 
 		if r != nil {
+			q.count++
 			return *r
 		}
 	}
@@ -64,7 +67,7 @@ func (q *Queue) IsEmpty() bool {
 	// FIXME: This effectively cycles the order of the output buffer. Kinda sad.
 
 	if len(q.overflow) > 0 {
-		return true
+		return false
 	}
 
 	select {
@@ -73,9 +76,9 @@ func (q *Queue) IsEmpty() bool {
 			// Put it back
 			q.Output <- r
 		}()
-		return true
-	default:
 		return false
+	default:
+		return true
 	}
 }
 
@@ -86,4 +89,9 @@ func (q *Queue) Wait() {
 	go func() {
 		q.Output <- r
 	}()
+}
+
+func (q *Queue) Count() int {
+	// Number of outputs produced.
+	return q.count
 }
