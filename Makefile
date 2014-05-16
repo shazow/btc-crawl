@@ -1,4 +1,4 @@
-btc-crawl: *.go
+btc-crawl: **.go
 	go build .
 
 build: btc-crawl

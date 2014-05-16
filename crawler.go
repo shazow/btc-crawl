@@ -10,15 +10,16 @@ import (
 
 // TODO: Break Client/Peer/Crawler into separate modules.
 type Crawler struct {
-	client       *Client
-	queue        *queue.Queue
-	numSeen      int
-	numUnique    int
-	numConnected int
-	numAttempted int
-	seenFilter   map[string]bool // TODO: Replace with bloom filter?
-	peerAge      time.Duration
-	shutdown     chan struct{}
+	client         *Client
+	queue          *queue.Queue
+	numSeen        int
+	numUnique      int
+	numConnected   int
+	numAttempted   int
+	seenFilter     map[string]bool // TODO: Replace with bloom filter?
+	PeerAge        time.Duration
+	ConnectTimeout time.Duration
+	shutdown       chan struct{}
 }
 
 type Result struct {
@@ -26,11 +27,10 @@ type Result struct {
 	Peers []*btcwire.NetAddress
 }
 
-func NewCrawler(client *Client, seeds []string, peerAge time.Duration) *Crawler {
+func NewCrawler(client *Client, seeds []string) *Crawler {
 	c := Crawler{
 		client:     client,
 		seenFilter: map[string]bool{},
-		peerAge:    peerAge,
 		shutdown:   make(chan struct{}, 1),
 	}
 	filter := func(address string) *string {
@@ -57,6 +57,7 @@ func (c *Crawler) handleAddress(address string) *Result {
 
 	client := c.client
 	peer := NewPeer(client, address)
+	peer.ConnectTimeout = c.ConnectTimeout
 	r := Result{Node: peer}
 
 	err := peer.Connect()
@@ -131,7 +132,7 @@ func (c *Crawler) filter(address string) *string {
 }
 
 func (c *Crawler) process(r *Result) *Result {
-	timestampSince := time.Now().Add(-c.peerAge)
+	timestampSince := time.Now().Add(-c.PeerAge)
 
 	for _, addr := range r.Peers {
 		if !addr.Timestamp.After(timestampSince) {
@@ -155,6 +156,9 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 	numActive := 0
 	isActive := true
 
+	// Block until we get the first item
+	c.queue.Wait()
+
 	// This is the main "event loop".
 	// FIXME: Feels like there should be a better way to manage the number of
 	// concurrent workers without limiting slots with workerChan and without
@@ -165,6 +169,14 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 			if !isActive {
 				// Don't start any new workers, leave the slot filled.
 				break
+			} else if c.queue.IsEmpty() {
+				<-workerChan
+
+				if numActive == 0 {
+					logger.Infof("Done.")
+					close(resultChan)
+					return
+				}
 			}
 
 			numActive++
@@ -178,13 +190,7 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 			if c.process(&r) != nil {
 				resultChan <- r
 			}
-
 			numActive--
-			if (!isActive || c.queue.IsEmpty()) && numActive == 0 {
-				logger.Infof("Done.")
-				close(resultChan)
-			}
-
 			<-workerChan
 
 		case <-c.shutdown:

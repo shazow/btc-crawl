@@ -61,5 +61,29 @@ func (q *Queue) next() string {
 }
 
 func (q *Queue) IsEmpty() bool {
-	return len(q.overflow) == 0
+	// FIXME: This effectively cycles the order of the output buffer. Kinda sad.
+
+	if len(q.overflow) > 0 {
+		return true
+	}
+
+	select {
+	case r := <-q.Output:
+		go func() {
+			// Put it back
+			q.Output <- r
+		}()
+		return true
+	default:
+		return false
+	}
+}
+
+func (q *Queue) Wait() {
+	// Wait until there is an Output. Useful for blocking until the queue is
+	// ramped up.
+	r := <-q.Output
+	go func() {
+		q.Output <- r
+	}()
 }

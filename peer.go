@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/conformal/btcwire"
 )
@@ -15,13 +16,15 @@ type Peer struct {
 	Address         string
 	UserAgent       string
 	ProtocolVersion int32
+	ConnectTimeout  time.Duration // For the connect phase (can be overridden)
 }
 
 func NewPeer(client *Client, address string) *Peer {
 	p := Peer{
-		client:  client,
-		pver:    client.pver,
-		Address: address,
+		client:         client,
+		pver:           client.pver,
+		Address:        address,
+		ConnectTimeout: time.Duration(20 * time.Second),
 	}
 	return &p
 }
@@ -30,7 +33,7 @@ func (p *Peer) Connect() error {
 	if p.conn != nil {
 		return fmt.Errorf("Peer already connected, can't connect again.")
 	}
-	conn, err := net.Dial("tcp", p.Address)
+	conn, err := net.DialTimeout("tcp", p.Address, p.ConnectTimeout)
 	if err != nil {
 		return err
 	}
