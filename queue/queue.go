@@ -18,13 +18,13 @@ func NewQueue(filter func(string) *string, bufferSize int) *Queue {
 		filter:   filter,
 	}
 
-	go func(input <-chan string, output chan<- string) {
+	go func() {
 		// Block until we have a next item
 		nextItem := q.next()
 
 		for {
 			select {
-			case item := <-input:
+			case item := <-q.Input:
 				// New input
 				r := q.filter(item)
 				if r != nil {
@@ -32,12 +32,12 @@ func NewQueue(filter func(string) *string, bufferSize int) *Queue {
 					q.overflow = append(q.overflow, *r)
 					q.count++
 				}
-			case output <- nextItem:
+			case q.Output <- nextItem:
 				// Block until we have more inputs
 				nextItem = q.next()
 			}
 		}
-	}(q.Input, q.Output)
+	}()
 
 	return &q
 }
@@ -64,7 +64,7 @@ func (q *Queue) next() string {
 }
 
 func (q *Queue) IsEmpty() bool {
-	// FIXME: This effectively cycles the order of the output buffer. Kinda sad.
+	// FIXME: This breaks everything, get rid of it.
 
 	if len(q.overflow) > 0 {
 		return false

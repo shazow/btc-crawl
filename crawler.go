@@ -183,7 +183,7 @@ func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
 			numActive++
 			go func() {
 				address := <-c.queue.Output
-				logger.Debugf("[%s] Worker started.", address)
+				logger.Debugf("[%s] Work received.", address)
 				tempResult <- *c.handleAddress(address)
 			}()
 
