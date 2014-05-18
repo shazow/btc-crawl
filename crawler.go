@@ -21,7 +21,7 @@ type Crawler struct {
 	PeerAge        time.Duration
 	ConnectTimeout time.Duration
 	shutdown       chan struct{}
-	wait           sync.WaitGroup
+	waitGroup      *sync.WaitGroup
 }
 
 type Result struct {
@@ -30,16 +30,18 @@ type Result struct {
 }
 
 func NewCrawler(client *Client, seeds []string) *Crawler {
+	var wg sync.WaitGroup
+
 	c := Crawler{
 		client:     client,
 		seenFilter: map[string]bool{},
 		shutdown:   make(chan struct{}, 1),
-		wait:       sync.WaitGroup{},
+		waitGroup:  &wg,
 	}
 	filter := func(address string) *string {
 		return c.filter(address)
 	}
-	c.queue = queue.NewQueue(filter, &c.wait)
+	c.queue = queue.NewQueue(filter, &wg)
 
 	// Prefill the queue
 	for _, address := range seeds {
@@ -140,7 +142,10 @@ func (c *Crawler) process(r *Result) *Result {
 			continue
 		}
 
-		c.queue.Add(NetAddressKey(addr))
+		c.waitGroup.Add(1)
+		if !c.queue.Add(NetAddressKey(addr)) {
+			c.waitGroup.Done()
+		}
 	}
 
 	if len(r.Peers) > 0 {
@@ -167,9 +172,7 @@ func (c *Crawler) Run(numWorkers int) <-chan Result {
 			}
 
 			// Start worker
-			c.wait.Add(1)
 			go func() {
-				logger.Debugf("[%s] Work received.", address)
 				r := c.handleAddress(address)
 
 				// Process the result
@@ -179,22 +182,17 @@ func (c *Crawler) Run(numWorkers int) <-chan Result {
 
 				// Clear worker slot
 				<-workerChan
-				c.wait.Done()
-				logger.Debugf("[%s] Work completed.", address)
+				c.waitGroup.Done()
 			}()
 		}
 
-		logger.Infof("Done after %d queued items.", c.queue.Count())
+		logger.Infof("Stopping queue after %d added items.", c.queue.Count())
+		close(result)
 	}()
 
 	go func() {
 		<-c.shutdown
-		logger.Infof("Shutting down after workers finish.")
 		isDone = true
-
-		// Urgent.
-		<-c.shutdown
-		close(result)
 	}()
 
 	return result

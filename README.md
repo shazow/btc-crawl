@@ -5,8 +5,6 @@ Bitcoin node network crawler (written in golang).
 This is a for-fun project to explore the Bitcoin protocol and network.
 
 Current status: 
-* **XXX:*** Broken. In the process of a major refactor which has a bug that
-  keeps thinking it's done prematurely.
 * JSON streaming is in place, and graceful shutdown.
 * ~~It crawls with all kinds of nice parameters but stores everything in memory
   until dumping a giant JSON blob at the end.~~
@@ -36,7 +34,8 @@ known nodes, but usually only several have timestamps within the last hour.
 (In approximate order of priority)
 
 * Apply peer-age filter to results
-* Add timeout option.
+* Output using some space-conscious format. Right now the output file grows
+  fairly quickly.
 * Namespace useful sub-packages properly (outside of `main`)
 
 

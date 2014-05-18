@@ -33,8 +33,6 @@ func (q *Queue) Add(item string) bool {
 	q.storage = append(q.storage, *r)
 	q.count++
 	q.Unlock()
-
-	q.waitGroup.Add(1)
 	q.cond.Signal()
 
 	return true
@@ -51,7 +49,6 @@ func (q *Queue) Iter() <-chan string {
 	go func() {
 		for {
 			q.Lock()
-
 			if len(q.storage) == 0 {
 				// Wait until next Add
 				q.cond.Wait()
@@ -59,14 +56,13 @@ func (q *Queue) Iter() <-chan string {
 				if len(q.storage) == 0 {
 					// Queue is finished
 					close(ch)
+					q.Unlock()
 					return
 				}
 			}
 
 			r := q.storage[0]
 			q.storage = q.storage[1:]
-
-			q.waitGroup.Done()
 			q.Unlock()
 
 			ch <- r

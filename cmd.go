@@ -102,12 +102,8 @@ func main() {
 	signal.Notify(sig, os.Interrupt)
 	go func() {
 		<-sig // Wait for ^C signal
-		logger.Warningf("Interrupt signal detected, shutting down gracefully by waiting for active workers to finish.")
+		logger.Warningf("Interrupt signal detected, shutting down.")
 		crawler.Shutdown()
-
-		<-sig // Hurry up?
-		logger.Warningf("Urgent interrupt. Abandoning in-progress workers.")
-		crawler.Shutdown() // FIXME: Could this cause stuff to asplode?
 	}()
 
 	// Launch crawler
