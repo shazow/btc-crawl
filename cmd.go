@@ -119,7 +119,7 @@ func main() {
 		}
 
 		if count > 0 {
-			b = append([]byte(","), b...)
+			b = append([]byte(",\n"), b...)
 		}
 
 		_, err = w.Write(b)

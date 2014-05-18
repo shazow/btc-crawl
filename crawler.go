@@ -21,7 +21,7 @@ type Crawler struct {
 	PeerAge        time.Duration
 	ConnectTimeout time.Duration
 	shutdown       chan struct{}
-	waitGroup      *sync.WaitGroup
+	waitGroup      sync.WaitGroup
 }
 
 type Result struct {
@@ -30,23 +30,28 @@ type Result struct {
 }
 
 func NewCrawler(client *Client, seeds []string) *Crawler {
-	var wg sync.WaitGroup
-
 	c := Crawler{
 		client:     client,
 		seenFilter: map[string]bool{},
 		shutdown:   make(chan struct{}, 1),
-		waitGroup:  &wg,
+		waitGroup:  sync.WaitGroup{},
 	}
 	filter := func(address string) *string {
 		return c.filter(address)
 	}
-	c.queue = queue.NewQueue(filter, &wg)
+
+	done := make(chan struct{})
+	c.queue = queue.NewQueue(filter, done)
 
 	// Prefill the queue
 	for _, address := range seeds {
-		c.queue.Add(address)
+		c.addSeed(address)
 	}
+
+	go func() {
+		c.waitGroup.Wait()
+		done <- struct{}{}
+	}()
 
 	return &c
 }
@@ -120,6 +125,13 @@ func (c *Crawler) handleAddress(address string) *Result {
 	}
 }
 
+func (c *Crawler) addSeed(address string) {
+	c.waitGroup.Add(1)
+	if c.queue.Add(address) == false {
+		c.waitGroup.Done()
+	}
+}
+
 func (c *Crawler) filter(address string) *string {
 	// Returns true if not seen before, otherwise false
 	c.numSeen++
@@ -142,10 +154,7 @@ func (c *Crawler) process(r *Result) *Result {
 			continue
 		}
 
-		c.waitGroup.Add(1)
-		if !c.queue.Add(NetAddressKey(addr)) {
-			c.waitGroup.Done()
-		}
+		c.addSeed(NetAddressKey(addr))
 	}
 
 	if len(r.Peers) > 0 {

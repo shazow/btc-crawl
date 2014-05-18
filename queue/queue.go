@@ -5,18 +5,18 @@ import "sync"
 // TODO: Make this an interface and multiple implementations (Redis etc?)
 type Queue struct {
 	sync.Mutex
-	storage   []string
-	filter    func(string) *string
-	count     int
-	cond      *sync.Cond
-	waitGroup *sync.WaitGroup
+	storage []string
+	filter  func(string) *string
+	count   int
+	cond    *sync.Cond
+	done    <-chan struct{}
 }
 
-func NewQueue(filter func(string) *string, waitGroup *sync.WaitGroup) *Queue {
+func NewQueue(filter func(string) *string, done <-chan struct{}) *Queue {
 	q := Queue{
-		storage:   []string{},
-		filter:    filter,
-		waitGroup: waitGroup,
+		storage: []string{},
+		filter:  filter,
+		done:    done,
 	}
 	q.cond = sync.NewCond(&q)
 
@@ -24,12 +24,13 @@ func NewQueue(filter func(string) *string, waitGroup *sync.WaitGroup) *Queue {
 }
 
 func (q *Queue) Add(item string) bool {
+	q.Lock()
 	r := q.filter(item)
 	if r == nil {
+		q.Unlock()
 		return false
 	}
 
-	q.Lock()
 	q.storage = append(q.storage, *r)
 	q.count++
 	q.Unlock()
@@ -42,7 +43,7 @@ func (q *Queue) Iter() <-chan string {
 	ch := make(chan string)
 
 	go func() {
-		q.waitGroup.Wait()
+		<-q.done
 		q.cond.Signal() // Wake up to close the channel.
 	}()
 
