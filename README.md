@@ -5,6 +5,8 @@ Bitcoin node network crawler (written in golang).
 This is a for-fun project to explore the Bitcoin protocol and network.
 
 Current status: 
+* **XXX:*** Broken. In the process of a major refactor which has a bug that
+  keeps thinking it's done prematurely.
 * JSON streaming is in place, and graceful shutdown.
 * ~~It crawls with all kinds of nice parameters but stores everything in memory
   until dumping a giant JSON blob at the end.~~
