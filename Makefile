@@ -1,5 +1,10 @@
-btc-crawl: **.go
+all: btc-crawl
+
+**/*.go:
 	go build ./...
+
+btc-crawl: **/*.go *.go
+	go build .
 
 build: btc-crawl
 

@@ -1,94 +1,79 @@
 package queue
 
-// A single goroutine manages the overflow queue for thread-safety, funneling
-// data between the Input and Output channels through a specified filter.
+import "sync"
+
+// TODO: Make this an interface and multiple implementations (Redis etc?)
 type Queue struct {
-	Input    chan string
-	Output   chan string
-	overflow []string
-	filter   func(string) *string
-	count    int
+	sync.Mutex
+	storage   []string
+	filter    func(string) *string
+	count     int
+	cond      *sync.Cond
+	waitGroup *sync.WaitGroup
 }
 
-func NewQueue(filter func(string) *string, bufferSize int) *Queue {
+func NewQueue(filter func(string) *string, waitGroup *sync.WaitGroup) *Queue {
 	q := Queue{
-		Input:    make(chan string, bufferSize),
-		Output:   make(chan string, bufferSize),
-		overflow: []string{},
-		filter:   filter,
+		storage:   []string{},
+		filter:    filter,
+		waitGroup: waitGroup,
 	}
-
-	go func() {
-		// Block until we have a next item
-		nextItem := q.next()
-
-		for {
-			select {
-			case item := <-q.Input:
-				// New input
-				r := q.filter(item)
-				if r != nil {
-					// Store in the overflow
-					q.overflow = append(q.overflow, *r)
-					q.count++
-				}
-			case q.Output <- nextItem:
-				// Block until we have more inputs
-				nextItem = q.next()
-			}
-		}
-	}()
+	q.cond = sync.NewCond(&q)
 
 	return &q
 }
 
-func (q *Queue) next() string {
-	// Block until a next item is available.
-
-	if len(q.overflow) > 0 {
-		// Pop off the overflow queue.
-		r := q.overflow[0]
-		q.overflow = q.overflow[1:]
-		return r
-	}
-
-	for {
-		// Block until we have a viable output
-		r := q.filter(<-q.Input)
-
-		if r != nil {
-			q.count++
-			return *r
-		}
-	}
-}
-
-func (q *Queue) IsEmpty() bool {
-	// FIXME: This breaks everything, get rid of it.
-
-	if len(q.overflow) > 0 {
+func (q *Queue) Add(item string) bool {
+	r := q.filter(item)
+	if r == nil {
 		return false
 	}
 
-	select {
-	case r := <-q.Output:
-		go func() {
-			// Put it back
-			q.Output <- r
-		}()
-		return false
-	default:
-		return true
-	}
+	q.Lock()
+	q.storage = append(q.storage, *r)
+	q.count++
+	q.Unlock()
+
+	q.waitGroup.Add(1)
+	q.cond.Signal()
+
+	return true
 }
 
-func (q *Queue) Wait() {
-	// Wait until there is an Output. Useful for blocking until the queue is
-	// ramped up.
-	r := <-q.Output
+func (q *Queue) Iter() <-chan string {
+	ch := make(chan string)
+
 	go func() {
-		q.Output <- r
+		q.waitGroup.Wait()
+		q.cond.Signal() // Wake up to close the channel.
 	}()
+
+	go func() {
+		for {
+			q.Lock()
+
+			if len(q.storage) == 0 {
+				// Wait until next Add
+				q.cond.Wait()
+
+				if len(q.storage) == 0 {
+					// Queue is finished
+					close(ch)
+					return
+				}
+			}
+
+			r := q.storage[0]
+			q.storage = q.storage[1:]
+
+			q.waitGroup.Done()
+			q.Unlock()
+
+			ch <- r
+		}
+	}()
+
+	return ch
 }
 
 func (q *Queue) Count() int {

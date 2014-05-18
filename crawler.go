@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"time"
 
 	"./queue"
@@ -20,6 +21,7 @@ type Crawler struct {
 	PeerAge        time.Duration
 	ConnectTimeout time.Duration
 	shutdown       chan struct{}
+	wait           sync.WaitGroup
 }
 
 type Result struct {
@@ -32,18 +34,17 @@ func NewCrawler(client *Client, seeds []string) *Crawler {
 		client:     client,
 		seenFilter: map[string]bool{},
 		shutdown:   make(chan struct{}, 1),
+		wait:       sync.WaitGroup{},
 	}
 	filter := func(address string) *string {
 		return c.filter(address)
 	}
-	c.queue = queue.NewQueue(filter, 10)
+	c.queue = queue.NewQueue(filter, &c.wait)
 
-	go func() {
-		// Prefill the queue
-		for _, address := range seeds {
-			c.queue.Input <- address
-		}
-	}()
+	// Prefill the queue
+	for _, address := range seeds {
+		c.queue.Add(address)
+	}
 
 	return &c
 }
@@ -139,7 +140,7 @@ func (c *Crawler) process(r *Result) *Result {
 			continue
 		}
 
-		c.queue.Input <- NetAddressKey(addr)
+		c.queue.Add(NetAddressKey(addr))
 	}
 
 	if len(r.Peers) > 0 {
@@ -150,53 +151,51 @@ func (c *Crawler) process(r *Result) *Result {
 	return nil
 }
 
-func (c *Crawler) Run(resultChan chan<- Result, numWorkers int) {
+func (c *Crawler) Run(numWorkers int) <-chan Result {
+	result := make(chan Result, 100)
 	workerChan := make(chan struct{}, numWorkers)
-	tempResult := make(chan Result)
-	numActive := 0
-	isActive := true
+	isDone := false
 
-	// Block until we get the first item
-	c.queue.Wait()
+	go func() {
+		// Queue handler
+		for address := range c.queue.Iter() {
+			// Reserve worker slot (block)
+			workerChan <- struct{}{}
 
-	// This is the main "event loop".
-	// FIXME: Feels like there should be a better way to manage the number of
-	// concurrent workers without limiting slots with workerChan and without
-	// using a numActive counter.
-	for {
-		select {
-		case workerChan <- struct{}{}:
-			if !isActive {
-				// Don't start any new workers, leave the slot filled.
+			if isDone {
 				break
-			} else if c.queue.IsEmpty() {
-				if numActive == 0 {
-					logger.Infof("Done after %d queued items.", c.queue.Count())
-					close(resultChan)
-					return
+			}
+
+			// Start worker
+			c.wait.Add(1)
+			go func() {
+				logger.Debugf("[%s] Work received.", address)
+				r := c.handleAddress(address)
+
+				// Process the result
+				if c.process(r) != nil {
+					result <- *r
 				}
 
+				// Clear worker slot
 				<-workerChan
-				break
-			}
-
-			numActive++
-			go func() {
-				address := <-c.queue.Output
-				logger.Debugf("[%s] Work received.", address)
-				tempResult <- *c.handleAddress(address)
+				c.wait.Done()
+				logger.Debugf("[%s] Work completed.", address)
 			}()
-
-		case r := <-tempResult:
-			if c.process(&r) != nil {
-				resultChan <- r
-			}
-			numActive--
-			<-workerChan
-
-		case <-c.shutdown:
-			logger.Infof("Shutting down after %d workers finish.", numActive)
-			isActive = false
 		}
-	}
+
+		logger.Infof("Done after %d queued items.", c.queue.Count())
+	}()
+
+	go func() {
+		<-c.shutdown
+		logger.Infof("Shutting down after workers finish.")
+		isDone = true
+
+		// Urgent.
+		<-c.shutdown
+		close(result)
+	}()
+
+	return result
 }

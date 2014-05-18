@@ -97,8 +97,6 @@ func main() {
 		return
 	}
 
-	resultChan := make(chan Result)
-
 	// Construct interrupt handler
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -109,11 +107,11 @@ func main() {
 
 		<-sig // Hurry up?
 		logger.Warningf("Urgent interrupt. Abandoning in-progress workers.")
-		close(resultChan) // FIXME: Could this cause stuff to asplode?
+		crawler.Shutdown() // FIXME: Could this cause stuff to asplode?
 	}()
 
 	// Launch crawler
-	go crawler.Run(resultChan, options.Concurrency)
+	resultChan := crawler.Run(options.Concurrency)
 	logger.Infof("Crawler started with %d concurrency limit.", options.Concurrency)
 
 	// Start processing results
