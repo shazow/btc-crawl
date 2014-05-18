@@ -37,6 +37,7 @@ known nodes, but usually only several have timestamps within the last hour.
 * Output using some space-conscious format. Right now the output file grows
   fairly quickly.
 * Namespace useful sub-packages properly (outside of `main`)
+* Fix race condition warnings.
 
 
 ## License
