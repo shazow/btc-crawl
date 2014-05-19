@@ -29,7 +29,7 @@ type Options struct {
 	Seed           []string      `short:"s" long:"seed" description:"Override which seeds to use." default-mask:"<bitcoin-core DNS seeds>"`
 	Concurrency    int           `short:"c" long:"concurrency" description:"Maximum number of concurrent connections to open." default:"10"`
 	ConnectTimeout time.Duration `short:"t" long:"connect-timeout" description:"Maximum time to wait to connect before giving up." default:"10s"`
-	UserAgent      string        `short:"A" long:"user-agent" description:"Client name to advertise while crawling. Should be in format of '/name:x.y.z/'." default:"/btc-crawl:0.1.1/"`
+	UserAgent      string        `short:"A" long:"user-agent" description:"Client name to advertise while crawling. Should be in format of '/name:x.y.z/'." default:"/btc-crawl:0.1.2/"`
 	PeerAge        time.Duration `long:"peer-age" description:"Ignore discovered peers older than this." default:"24h"`
 	StopAfter      int           `long:"stop-after" description:"Stop crawling after this many results." default:"0"`
 }

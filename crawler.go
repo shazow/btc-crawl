@@ -101,6 +101,7 @@ func (c *Crawler) handleAddress(address string) *Result {
 		// many unrelated messages.
 		msg, _, err := peer.ReadMessage()
 		if err != nil {
+			otherMessages = append(otherMessages, err.Error())
 			logger.Warningf("[%s] Failed to read message: %v", address, err)
 			continue
 		}
