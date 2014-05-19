@@ -1,16 +1,17 @@
 package main
 
 import (
-	"github.com/conformal/btcwire"
 	"net"
 	"sync"
+
+	"github.com/conformal/btcwire"
 )
 
 func GetSeedsFromDNS(dnsSeeds []string) []string {
 	wait := sync.WaitGroup{}
 	results := make(chan []net.IP)
 
-	for _, address := range dnsSeeds {
+	for _, seed := range dnsSeeds {
 		wait.Add(1)
 		go func(address string) {
 			defer wait.Done()
@@ -21,7 +22,7 @@ func GetSeedsFromDNS(dnsSeeds []string) []string {
 			}
 			logger.Debugf("Resolved %d seeds from %s.", len(ips), address)
 			results <- ips
-		}(address)
+		}(seed)
 	}
 
 	go func() {

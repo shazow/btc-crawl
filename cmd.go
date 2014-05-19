@@ -40,6 +40,34 @@ var logLevels = []log.Level{
 	log.Debug,
 }
 
+type ResultJSON struct {
+	Address   string   `json:"address"`
+	UserAgent string   `json:"useragent"`
+	Peers     []string `json:"peers"`
+}
+
+func NewResultJSON(result *Result, peerAge time.Duration) *ResultJSON {
+	// Convert the full result object into the subset which we want to return
+	// as JSON.
+	timestampSince := time.Now().Add(-peerAge)
+	peers := []string{}
+	for _, addr := range result.Peers {
+		if !addr.Timestamp.After(timestampSince) {
+			continue
+		}
+
+		peers = append(peers, NetAddressKey(addr))
+	}
+
+	r := ResultJSON{
+		Address:   result.Node.Address,
+		UserAgent: result.Node.UserAgent,
+		Peers:     peers,
+	}
+
+	return &r
+}
+
 func main() {
 	now := time.Now()
 	options := Options{}
@@ -113,7 +141,8 @@ func main() {
 	// Start processing results
 	count := 0
 	for result := range resultChan {
-		b, err := json.Marshal(result)
+		jsonResult := NewResultJSON(&result, options.PeerAge)
+		b, err := json.Marshal(jsonResult)
 		if err != nil {
 			logger.Warningf("Failed to export JSON, skipping: %v", err)
 		}

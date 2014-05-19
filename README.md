@@ -33,11 +33,9 @@ known nodes, but usually only several have timestamps within the last hour.
 
 (In approximate order of priority)
 
-* Apply peer-age filter to results
-* Output using some space-conscious format. Right now the output file grows
-  fairly quickly.
 * Namespace useful sub-packages properly (outside of `main`)
-* Fix race condition warnings.
+* Fix race condition warnings. (Not sure if this is feasible. `golog` and other
+  fundamental pieces seem to trigger warnings possibly erroneously.)
 
 
 ## License

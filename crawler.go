@@ -148,9 +148,11 @@ func (c *Crawler) filter(address string) *string {
 
 func (c *Crawler) process(r *Result) *Result {
 	timestampSince := time.Now().Add(-c.PeerAge)
+	numStalePeers := 0
 
 	for _, addr := range r.Peers {
 		if !addr.Timestamp.After(timestampSince) {
+			numStalePeers++
 			continue
 		}
 
@@ -158,7 +160,7 @@ func (c *Crawler) process(r *Result) *Result {
 	}
 
 	if len(r.Peers) > 0 {
-		logger.Infof("[%s] Returned %d peers. Total %d unique peers via %d connected (of %d attempted).", r.Node.Address, len(r.Peers), c.numUnique, c.numConnected, c.numAttempted)
+		logger.Infof("[%s] Returned %d peers (including %d stale). Total %d unique peers via %d connected (of %d attempted).", r.Node.Address, len(r.Peers), numStalePeers, c.numUnique, c.numConnected, c.numAttempted)
 		return r
 	}
 
