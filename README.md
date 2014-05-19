@@ -18,7 +18,12 @@ stdout.~~
 $ go get github.com/shazow/btc-crawl
 $ btc-crawl --help
 ...
-$ btc-crawl --concurrency 100 --output btc-crawl.json --verbose
+$ btc-crawl \
+  --concurrency=100 \
+  --output="btc-crawl.json" \
+  --peer-age="24h" \
+  --user-agent="/batman:1.0/" \
+  --verbose
 ...
 ```
 
@@ -34,8 +39,9 @@ known nodes, but usually only several have timestamps within the last hour.
 (In approximate order of priority)
 
 * Namespace useful sub-packages properly (outside of `main`)
-* Fix race condition warnings. (Not sure if this is feasible. `golog` and other
+* Fix `go build -race` race condition warnings. (Not sure if this is feasible. `golog` and other
   fundamental pieces seem to trigger warnings possibly erroneously.)
+* Tests would be nice.
 
 
 ## License
