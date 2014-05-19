@@ -99,6 +99,11 @@ func (c *Crawler) handleAddress(address string) *Result {
 		// We can't really tell when we're done receiving peers, so we stop either
 		// when we get a smaller-than-normal set size or when we've received too
 		// many unrelated messages.
+		if len(otherMessages) > tolerateMessages {
+			logger.Debugf("[%s] Giving up with %d results after tolerating messages: %v.", address, len(r.Peers), otherMessages)
+			return &r
+		}
+
 		msg, _, err := peer.ReadMessage()
 		if err != nil {
 			otherMessages = append(otherMessages, err.Error())
@@ -118,10 +123,6 @@ func (c *Crawler) handleAddress(address string) *Result {
 			}
 		default:
 			otherMessages = append(otherMessages, tmsg.Command())
-			if len(otherMessages) > tolerateMessages {
-				logger.Debugf("[%s] Giving up with %d results after tolerating messages: %v.", address, len(r.Peers), otherMessages)
-				return &r
-			}
 		}
 	}
 }
