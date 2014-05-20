@@ -4,15 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"./queue"
-
 	"github.com/conformal/btcwire"
 )
 
 // TODO: Break Client/Peer/Crawler into separate modules.
 type Crawler struct {
 	client         *Client
-	queue          *queue.Queue
+	queue          *Queue
 	numSeen        int
 	numUnique      int
 	numConnected   int
@@ -41,7 +39,7 @@ func NewCrawler(client *Client, seeds []string) *Crawler {
 	}
 
 	done := make(chan struct{})
-	c.queue = queue.NewQueue(filter, done)
+	c.queue = NewQueue(filter, done)
 
 	// Prefill the queue
 	for _, address := range seeds {
