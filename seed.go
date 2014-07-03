@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/conformal/btcwire"
+	"github.com/conformal/btcnet"
 )
 
 func GetSeedsFromDNS(dnsSeeds []string) []string {
@@ -33,7 +33,7 @@ func GetSeedsFromDNS(dnsSeeds []string) []string {
 	seeds := []string{}
 	for ips := range results {
 		for _, ip := range ips {
-			seeds = append(seeds, net.JoinHostPort(ip.String(), btcwire.MainPort))
+			seeds = append(seeds, net.JoinHostPort(ip.String(), btcnet.MainNetParams.DefaultPort))
 		}
 	}
 
