@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 type Client struct {

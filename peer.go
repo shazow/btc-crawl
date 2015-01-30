@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 type Peer struct {

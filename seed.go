@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/conformal/btcnet"
+	"github.com/btcsuite/btcnet"
 )
 
 func GetSeedsFromDNS(dnsSeeds []string) []string {

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // TODO: Break Client/Peer/Crawler into separate modules.

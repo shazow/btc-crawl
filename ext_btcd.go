@@ -1,11 +1,11 @@
-// Things borrowed from https://github.com/conformal/btcd/blob/master/addrmanager.go
-// because "github.com/conformal/btcd" wouldn't import for some reason.
+// Things borrowed from https://github.com/btcsuite/btcd/blob/master/addrmanager.go
+// because "github.com/btcsuite/btcd" wouldn't import for some reason.
 
 package main
 
 import (
 	"encoding/base32"
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 	"net"
 	"strconv"
 	"strings"
