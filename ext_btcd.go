@@ -5,7 +5,7 @@ package main
 
 import (
 	"encoding/base32"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 	"net"
 	"strconv"
 	"strings"
@@ -14,7 +14,7 @@ import (
 var onioncatrange = net.IPNet{IP: net.ParseIP("FD87:d87e:eb43::"),
 	Mask: net.CIDRMask(48, 128)}
 
-func Tor(na *btcwire.NetAddress) bool {
+func Tor(na *wire.NetAddress) bool {
 	// bitcoind encodes a .onion address as a 16 byte number by decoding the
 	// address prior to the .onion (i.e. the key hash) base32 into a ten
 	// byte number. it then stores the first 6 bytes of the address as
@@ -29,7 +29,7 @@ func Tor(na *btcwire.NetAddress) bool {
 // ipString returns a string for the ip from the provided NetAddress. If the
 // ip is in the range used for tor addresses then it will be transformed into
 // the relavent .onion address.
-func ipString(na *btcwire.NetAddress) string {
+func ipString(na *wire.NetAddress) string {
 	if Tor(na) {
 		// We know now that na.IP is long enogh.
 		base32 := base32.StdEncoding.EncodeToString(na.IP[6:])
@@ -41,7 +41,7 @@ func ipString(na *btcwire.NetAddress) string {
 
 // NetAddressKey returns a string key in the form of ip:port for IPv4 addresses
 // or [ip]:port for IPv6 addresses.
-func NetAddressKey(na *btcwire.NetAddress) string {
+func NetAddressKey(na *wire.NetAddress) string {
 	port := strconv.FormatUint(uint64(na.Port), 10)
 	addr := net.JoinHostPort(ipString(na), port)
 	return addr
