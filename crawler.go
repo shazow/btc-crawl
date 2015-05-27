@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // TODO: Break Client/Peer/Crawler into separate modules.
@@ -24,7 +24,7 @@ type Crawler struct {
 
 type Result struct {
 	Node  *Peer
-	Peers []*btcwire.NetAddress
+	Peers []*wire.NetAddress
 }
 
 func NewCrawler(client *Client, seeds []string) *Crawler {
@@ -80,7 +80,7 @@ func (c *Crawler) handleAddress(address string) *Result {
 	}
 
 	// Send getaddr.
-	err = peer.WriteMessage(btcwire.NewMsgGetAddr())
+	err = peer.WriteMessage(wire.NewMsgGetAddr())
 	if err != nil {
 		logger.Warningf("[%s] GetAddr failed: %v", address, err)
 		return &r
@@ -110,7 +110,7 @@ func (c *Crawler) handleAddress(address string) *Result {
 		}
 
 		switch tmsg := msg.(type) {
-		case *btcwire.MsgAddr:
+		case *wire.MsgAddr:
 			r.Peers = append(r.Peers, tmsg.AddrList...)
 
 			if firstReceived == -1 {

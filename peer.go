@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 type Peer struct {
@@ -54,13 +54,13 @@ func (p *Peer) Handshake() error {
 
 	logger.Debugf("[%s] Starting handshake.", p.Address)
 
-	nonce, err := btcwire.RandomUint64()
+	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return err
 	}
 	p.nonce = nonce
 
-	msgVersion, err := btcwire.NewMsgVersionFromConn(p.conn, p.nonce, 0)
+	msgVersion, err := wire.NewMsgVersionFromConn(p.conn, p.nonce, 0)
 	msgVersion.UserAgent = p.client.userAgent
 	msgVersion.DisableRelayTx = true
 	if err := p.WriteMessage(msgVersion); err != nil {
@@ -72,7 +72,7 @@ func (p *Peer) Handshake() error {
 	if err != nil {
 		return err
 	}
-	vmsg, ok := msg.(*btcwire.MsgVersion)
+	vmsg, ok := msg.(*wire.MsgVersion)
 	if !ok {
 		return fmt.Errorf("Did not receive version message: %T", vmsg)
 	}
@@ -90,17 +90,17 @@ func (p *Peer) Handshake() error {
 	// accept external connections so we skip it.
 
 	// Send verack.
-	if err := p.WriteMessage(btcwire.NewMsgVerAck()); err != nil {
+	if err := p.WriteMessage(wire.NewMsgVerAck()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Peer) WriteMessage(msg btcwire.Message) error {
-	return btcwire.WriteMessage(p.conn, msg, p.pver, p.client.btcnet)
+func (p *Peer) WriteMessage(msg wire.Message) error {
+	return wire.WriteMessage(p.conn, msg, p.pver, p.client.btcnet)
 }
 
-func (p *Peer) ReadMessage() (btcwire.Message, []byte, error) {
-	return btcwire.ReadMessage(p.conn, p.pver, p.client.btcnet)
+func (p *Peer) ReadMessage() (wire.Message, []byte, error) {
+	return wire.ReadMessage(p.conn, p.pver, p.client.btcnet)
 }

@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 func GetSeedsFromDNS(dnsSeeds []string) []string {
@@ -33,7 +33,7 @@ func GetSeedsFromDNS(dnsSeeds []string) []string {
 	seeds := []string{}
 	for ips := range results {
 		for _, ip := range ips {
-			seeds = append(seeds, net.JoinHostPort(ip.String(), btcnet.MainNetParams.DefaultPort))
+			seeds = append(seeds, net.JoinHostPort(ip.String(), chaincfg.MainNetParams.DefaultPort))
 		}
 	}
 
